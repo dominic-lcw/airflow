@@ -41,9 +41,9 @@ type AssetEventProps = {
   readonly assetId?: number;
   readonly data?: AssetEventCollectionResponse;
   readonly isLoading?: boolean;
+  readonly [key: string]: unknown;
   readonly setOrderBy?: (order: string) => void;
   readonly setTableUrlState?: (state: TableState) => void;
-  readonly sx?: BoxProps;
   readonly tableUrlState?: TableState;
   readonly title?: string;
 };
@@ -54,7 +54,6 @@ export const AssetEvents = ({
   isLoading,
   setOrderBy,
   setTableUrlState,
-  sx,
   tableUrlState,
   title,
   ...rest
