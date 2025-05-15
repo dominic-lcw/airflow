@@ -30,7 +30,8 @@ import {
 import type { PartialEventContext } from "chartjs-plugin-annotation";
 import annotationPlugin from "chartjs-plugin-annotation";
 import dayjs from "dayjs";
-import { Bar } from "react-chartjs-2";
+import { useRef } from "react";
+import { Bar, getElementsAtEvent } from "react-chartjs-2";
 import { useNavigate } from "react-router-dom";
 
 import type { TaskInstanceResponse, DAGRunResponse } from "openapi/requests/types.gen";
@@ -65,6 +66,7 @@ export const DurationChart = ({
   readonly entries: Array<RunResponse> | undefined;
   readonly kind: "Dag Run" | "Task Instance";
 }) => {
+  const chartRef = useRef<ChartJS<"bar">>();
   const navigate = useNavigate();
 
   if (!entries) {
@@ -93,6 +95,36 @@ export const DurationChart = ({
     },
     scaleID: "y",
     value: (ctx: PartialEventContext) => average(ctx, 0),
+  };
+
+  const onClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (chartRef.current) {
+      const elements = getElementsAtEvent(chartRef.current, event);
+
+      if (elements.length > 0 && elements[0]) {
+        const [{ index }] = elements;
+
+        let navigatePath;
+
+        switch (kind) {
+          case "Dag Run": {
+            const entry = entries[index] as DAGRunResponse;
+
+            navigatePath = `/dags/${entry.dag_id}/runs/${entry.dag_run_id}/`;
+            break;
+          }
+          case "Task Instance": {
+            const entry = entries[index] as TaskInstanceResponse;
+
+            navigatePath = `/dags/${entry.dag_id}/runs/${entry.dag_run_id}/tasks/${entry.task_id}`;
+            break;
+          }
+          default:
+            return;
+        }
+        navigate(navigatePath);
+      }
+    }
   };
 
   return (
@@ -143,33 +175,12 @@ export const DurationChart = ({
           labels: entries.map((entry: RunResponse) => dayjs(entry.run_after).format("YYYY-MM-DD, hh:mm:ss")),
         }}
         datasetIdKey="id"
+        onClick={onClick}
         options={{
-          onClick: (_event, elements) => {
-            const [element] = elements;
-
-            if (!element) {
-              return;
+          onHover: (event, chartElement) => {
+            if (event.native?.target instanceof HTMLElement) {
+              event.native.target.style.cursor = chartElement.length > 0 ? "pointer" : "default";
             }
-
-            const entry = entries[element.index];
-            const baseUrl = `/dags/${entry?.dag_id}/runs/${entry?.dag_run_id}`;
-
-            switch (kind) {
-              case "Dag Run": {
-                navigate(baseUrl);
-                break;
-              }
-              case "Task Instance": {
-                const taskInstance = entry as TaskInstanceResponse;
-
-                navigate(`${baseUrl}/tasks/${taskInstance.task_id}`);
-                break;
-              }
-              default:
-            }
-          },
-          onHover: (_event, elements, chart) => {
-            chart.canvas.style.cursor = elements.length > 0 ? "pointer" : "default";
           },
           plugins: {
             annotation: {
@@ -182,17 +193,19 @@ export const DurationChart = ({
           responsive: true,
           scales: {
             x: {
+              display: false, // This hides the x-axis
               stacked: true,
               ticks: {
-                maxTicksLimit: 3,
+                display: false, // This hides the tick labels
               },
-              title: { align: "end", display: true, text: "Run After" },
+              title: { display: false }, // This hides the axis title
             },
             y: {
               title: { align: "end", display: true, text: "Duration (seconds)" },
             },
           },
         }}
+        ref={chartRef}
       />
     </Box>
   );
